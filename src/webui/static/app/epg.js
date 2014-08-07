@@ -135,10 +135,14 @@ tvheadend.epgDetails = function(event) {
         height: 300,
         constrainHeader: true,
         buttons: [confcombo, new Ext.Button({
-                handler: recordEvent,
+                handler: function() {
+                    record('recordEvent', event);
+                },
                 text: "Record program"
             }), new Ext.Button({
-                handler: recordSeries,
+                handler: function() {
+                    record('recordSeries', event);
+                },
                 text: event.serieslink ? "Record series" : "Autorec"
             })],
         buttonAlign: 'center',
@@ -146,24 +150,13 @@ tvheadend.epgDetails = function(event) {
     });
     win.show();
 
-    function recordEvent() {
-        record('recordEvent');
-    }
-
-    function recordSeries() {
-        record('recordSeries');
-    }
-
-    function record(op) {
+    function record(op, event) {
         Ext.Ajax.request({
             url: 'dvr',
             params: {
                 eventId: event.id,
                 op: op,
                 config_name: confcombo.getValue()
-            },
-            success: function(response, options) {
-                win.close();
             },
             failure: function(response, options) {
                 Ext.MessageBox.alert('DVR', response.statusText);
@@ -618,19 +611,43 @@ tvheadend.epg = function() {
             msg: 'Buffering. Please wait...'
         }
     });
-
-    var panel = new Ext.ux.grid.livegrid.GridPanel({
-        stateful: true,
-        stateId: 'epggrid',
-        enableDragDrop: false,
-        cm: epgCm,
-        plugins: [actions],
-        title: 'Electronic Program Guide',
-        iconCls: 'newspaper',
-        store: epgStore,
-        selModel: new Ext.ux.grid.livegrid.RowSelectionModel(),
-        view: epgView,
-        tbar: [
+    
+    function scheduleSelected() {
+        var selectedKeys = panel.selModel.selections.keys;
+        
+        for (var i = 0; i < selectedKeys.length; i++)
+        {
+            var event = epgStore.getById(selectedKeys[i]).data;
+            
+            Ext.Ajax.request({
+                url: 'dvr',
+                params: {
+                    eventId: event.id,
+                    op: 'recordEvent',
+                    config_name: ''
+                },
+                failure: function(response, options) {
+                    Ext.MessageBox.alert('DVR', response.statusText);
+                }
+            });
+        }
+    }
+    
+    var scheduleButton = new Ext.Toolbar.Button({
+        tooltip: 'Schedule the selected programmes',
+        iconCls: 'clock',
+        text: 'Schedule selected',
+        handler: scheduleSelected,
+        disabled: true
+    });
+    
+    // Define which panel buttons should be visible
+    var panelButtons = [scheduleButton];
+    
+    var filterToolbar = {
+        xtype: 'toolbar',
+        dock: 'top',
+        items: [
             epgFilterTitle,
             '-',
             epgFilterChannels,
@@ -666,7 +683,46 @@ tvheadend.epg = function() {
                 handler: function() {
                     new tvheadend.help('Electronic Program Guide', 'epg.html');
                 }
-            }],
+            }]
+    };
+        
+    var actionToolbar = {
+        xtype: 'toolbar',
+        dock: 'top',
+        items: [
+            panelButtons
+        ]
+    };
+    
+    var selectionModel = new Ext.ux.grid.livegrid.RowSelectionModel();
+    
+    // Enable "Schedule selected" when at least one row is selected
+    selectionModel.on('selectionchange', function(self) {
+        if (self.getCount() > 0)
+            scheduleButton.enable();
+        else
+            scheduleButton.disable();
+    });
+
+    var panel = new Ext.ux.grid.livegrid.GridPanel({
+        stateful: true,
+        stateId: 'epggrid',
+        enableDragDrop: false,
+        cm: epgCm,
+        plugins: [actions],
+        title: 'Electronic Program Guide',
+        iconCls: 'newspaper',
+        store: epgStore,
+        selModel: selectionModel,
+        view: epgView,
+        tbar: {
+            xtype: 'container',
+            layout: 'anchor',
+            items: [
+                filterToolbar,
+                actionToolbar,
+            ]
+        },
         bbar: new Ext.ux.grid.livegrid.Toolbar({
             view: epgView,
             displayInfo: true
