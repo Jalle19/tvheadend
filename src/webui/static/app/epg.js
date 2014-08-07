@@ -242,11 +242,20 @@ tvheadend.epg = function() {
 
     var actions = new Ext.ux.grid.RowActions({
         header: '',
-        width: 20,
+        width: 45,
         dataIndex: 'actions',
-        actions: [{
+        actions: [
+            {
                 iconIndex: 'schedstate'
-            }]
+            },
+            {
+                iconCls: 'info',
+                qtip: 'Programme details',
+                cb: function(grid, rec, act, row) {
+                    new tvheadend.epgDetails(grid.getStore().getAt(row).data);
+                }
+            }
+        ]
     });
 
     var epgStore = new Ext.ux.grid.livegrid.Store({
@@ -663,12 +672,6 @@ tvheadend.epg = function() {
             displayInfo: true
         })
     });
-
-    panel.on('rowclick', rowclicked);
-
-    function rowclicked(grid, index) {
-        new tvheadend.epgDetails(grid.getStore().getAt(index).data);
-    }
 
     function createAutoRec() {
 
